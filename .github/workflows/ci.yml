@@ -11,7 +11,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Syntax check (Windows PowerShell 5.1)
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build
+        run: dotnet build src/CleanVaiLon/CleanVaiLon.csproj -c Release --nologo
+
+      - name: Unit tests (safe-delete rules, data formats)
+        run: dotnet test tests/CleanVaiLon.Tests/CleanVaiLon.Tests.csproj -c Release --nologo --filter "Category!=Smoke"
+
+      # The PowerShell version stays in legacy/ until the C# port is confirmed.
+      - name: Legacy script – syntax check (Windows PowerShell 5.1)
         shell: powershell
         run: |
           $bad = 0
@@ -31,9 +42,9 @@ jobs:
           }
           if ($missing) { $missing.FullName; exit 1 }
 
-      - name: Safe-delete rules
+      - name: Legacy script – safe-delete rules
         shell: powershell
-        run: .\tests\Test-Safety.ps1
+        run: .\legacy\tests\Test-Safety.ps1
 
       - name: Portable package builds
         shell: powershell

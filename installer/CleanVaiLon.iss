@@ -1,13 +1,15 @@
 ﻿; Inno Setup script for Clean VaiLon.
-; Build with tools\Build-Release.ps1, which passes the version read from CleanVaiLon.ps1:
-;   ISCC.exe /DMyAppVersion=1.3.0 installer\CleanVaiLon.iss
+; Build with tools\Build-Release.ps1, which publishes CleanVaiLon.exe to publish\ and passes the version
+; read from Directory.Build.props:
+;   dotnet publish src\CleanVaiLon -c Release -o publish
+;   ISCC.exe /DMyAppVersion=2.0.0 installer\CleanVaiLon.iss
 
 #ifndef MyAppVersion
   #define MyAppVersion "0.0.0"
 #endif
 #define MyAppName "Clean VaiLon"
 #define MyAppUrl "https://github.com/azxje1506/CleanVaiLon"
-#define PowerShell "{sys}\WindowsPowerShell\v1.0\powershell.exe"
+#define MyAppExe "CleanVaiLon.exe"
 
 [Setup]
 AppId={{85790FCE-9FC2-4EEC-AA1B-EB6F146A44FC}
@@ -18,6 +20,7 @@ AppPublisher=azxje1506
 AppPublisherURL={#MyAppUrl}
 AppSupportURL={#MyAppUrl}/issues
 AppUpdatesURL={#MyAppUrl}/releases
+VersionInfoVersion={#MyAppVersion}
 ; Per-user install by default (no admin needed for setup); the app asks for admin itself when it starts.
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
@@ -25,7 +28,7 @@ DefaultDirName={autopf}\CleanVaiLon
 DisableProgramGroupPage=yes
 LicenseFile=..\LICENSE
 SetupIconFile=..\CleanVaiLon.ico
-UninstallDisplayIcon={app}\CleanVaiLon.ico
+UninstallDisplayIcon={app}\{#MyAppExe}
 UninstallDisplayName={#MyAppName}
 OutputDir=..\dist
 OutputBaseFilename=CleanVaiLon-Setup-{#MyAppVersion}
@@ -43,18 +46,23 @@ Name: "en"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 
 [Files]
-Source: "..\CleanVaiLon.ps1"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\CleanVaiLon.bat"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\CleanVaiLon.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\publish\{#MyAppExe}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 
+[InstallDelete]
+; Files of the 1.x PowerShell version, replaced by CleanVaiLon.exe.
+Type: files; Name: "{app}\CleanVaiLon.ps1"
+Type: files; Name: "{app}\CleanVaiLon.bat"
+Type: files; Name: "{app}\CleanVaiLon.ico"
+
 [Icons]
-Name: "{autoprograms}\{#MyAppName}"; Filename: "{#PowerShell}"; Parameters: "-NoProfile -ExecutionPolicy Bypass -STA -File ""{app}\CleanVaiLon.ps1"""; WorkingDir: "{app}"; IconFilename: "{app}\CleanVaiLon.ico"; Comment: "Windows checkup and cleanup"; Flags: runminimized
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{#PowerShell}"; Parameters: "-NoProfile -ExecutionPolicy Bypass -STA -File ""{app}\CleanVaiLon.ps1"""; WorkingDir: "{app}"; IconFilename: "{app}\CleanVaiLon.ico"; Comment: "Windows checkup and cleanup"; Flags: runminimized; Tasks: desktopicon
+Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExe}"; WorkingDir: "{app}"; Comment: "Windows checkup and cleanup"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExe}"; WorkingDir: "{app}"; Comment: "Windows checkup and cleanup"; Tasks: desktopicon
 
 [Run]
-Filename: "{#PowerShell}"; Parameters: "-NoProfile -ExecutionPolicy Bypass -STA -File ""{app}\CleanVaiLon.ps1"""; WorkingDir: "{app}"; Description: "{cm:LaunchProgram,{#MyAppName}}"; Flags: nowait postinstall skipifsilent runminimized
+; The exe asks for administrator rights itself (app manifest), so it is started through the shell.
+Filename: "{app}\{#MyAppExe}"; WorkingDir: "{app}"; Description: "{cm:LaunchProgram,{#MyAppName}}"; Flags: nowait postinstall skipifsilent shellexec
 
 [UninstallRun]
 ; Remove the "start with Windows" logon task if the user turned it on in Settings.

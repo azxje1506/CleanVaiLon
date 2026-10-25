@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.0.0 – chương trình .exe thật
+
+- Viết lại bằng C# WinForms (.NET Framework 4.8 có sẵn trong Windows): bộ cài và lối tắt chạy thẳng `CleanVaiLon.exe` (khoảng 250 KB), không còn qua powershell.exe.
+- Giữ nguyên 9 trang, giao diện, bộ luật "xoá được?", cách chuyển vào Thùng rác, xác nhận và nhật ký.
+- Giữ định dạng `caidat.json`, `nhatky.txt`, `dichvu_da_tat.txt`: nâng cấp từ 1.x không mất cài đặt. Tác vụ "khởi động cùng Windows" cũ được chuyển sang exe.
+- Kiểm tra chữ ký số không còn kết nối mạng (không kiểm tra thu hồi chứng chỉ).
+- Unit test (xUnit) cho bộ luật an toàn và định dạng tệp; CI build bằng `dotnet`.
+- Bản PowerShell được giữ trong `legacy/` cho tới khi bản mới được xác nhận.
+
 ## 1.3.0 – bản công khai đầu tiên
 
 - 9 trang: Hiệu năng, Khởi động, Ổ đĩa, Phân tích (treemap), Ứng dụng, Bảo mật, Sao lưu, Nhật ký, Cài đặt.

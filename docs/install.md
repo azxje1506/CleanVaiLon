@@ -1,6 +1,6 @@
 # Cài đặt và gỡ bỏ
 
-Clean VaiLon chạy trên **Windows 10 / 11 (64-bit)** với Windows PowerShell 5.1 có sẵn trong Windows. Không cần cài .NET hay thư viện nào khác.
+Clean VaiLon là một chương trình `CleanVaiLon.exe` chạy trên **Windows 10 / 11 (64-bit)**. Nó dùng .NET Framework 4.8 có sẵn trong Windows 10 (bản 1903 trở lên) và Windows 11, nên không cần cài thêm gì.
 
 Có hai cách cài, tải ở trang [Releases](https://github.com/azxje1506/CleanVaiLon/releases/latest):
 
@@ -15,7 +15,7 @@ Có hai cách cài, tải ở trang [Releases](https://github.com/azxje1506/Clea
 Mở PowerShell ở thư mục chứa tệp vừa tải và so mã với dòng tương ứng trong `SHA256SUMS`:
 
 ```powershell
-Get-FileHash .\CleanVaiLon-Setup-1.3.0.exe
+Get-FileHash .\CleanVaiLon-Setup-2.0.0.exe
 ```
 
 ## Cách 1 – Bộ cài
@@ -30,15 +30,14 @@ Mặc định công cụ được cài vào `%LOCALAPPDATA%\Programs\CleanVaiLon
 ## Cách 2 – Bản portable
 
 1. Giải nén vào một thư mục cố định, ví dụ `D:\Tools\CleanVaiLon`.
-2. Mở PowerShell trong thư mục đó và chạy **một lần** để bỏ dấu "tải từ Internet":
-   ```powershell
-   Get-ChildItem -Recurse | Unblock-File
-   ```
-3. Bấm đúp `CleanVaiLon.bat`.
-4. Tuỳ chọn – tạo lối tắt có icon trên Desktop và Start Menu:
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File .\CreateShortcut.ps1
-   ```
+2. Bấm đúp `CleanVaiLon.exe`, chọn **Yes** khi Windows hỏi quyền quản trị. Nếu SmartScreen chặn: **More info → Run anyway**.
+3. Tuỳ chọn – tạo lối tắt: chuột phải `CleanVaiLon.exe` → **Send to → Desktop (create shortcut)**.
+
+## Nâng cấp từ bản 1.x (PowerShell)
+
+Chạy bộ cài mới đè lên bản cũ: các tệp `CleanVaiLon.ps1`, `CleanVaiLon.bat`, `CleanVaiLon.ico` được xoá, lối tắt trỏ sang `CleanVaiLon.exe`. Cài đặt (`caidat.json`), nhật ký (`nhatky.txt`) và danh sách dịch vụ đã tắt được giữ nguyên. Nếu bạn đã bật **khởi động cùng Windows**, lần mở đầu tiên công cụ tự chuyển tác vụ đó sang `CleanVaiLon.exe`.
+
+Bản portable 1.x: xoá thư mục cũ, giải nén bản mới.
 
 ## Gỡ bỏ
 
@@ -51,4 +50,4 @@ Gỡ công cụ **không** hoàn tác những thay đổi bạn đã làm bằng
 
 ## Phần mềm diệt virus cảnh báo?
 
-Xem mục *"Vì sao phần mềm diệt virus có thể cảnh báo?"* trong [README](../README.md). Toàn bộ mã nguồn nằm trong `CleanVaiLon.ps1`, bạn có thể đọc trước khi chạy.
+Xem mục *"Vì sao phần mềm diệt virus có thể cảnh báo?"* trong [README](../README.md). Toàn bộ mã nguồn nằm trong thư mục `src/` của repo, bạn có thể đọc và tự build trước khi chạy.

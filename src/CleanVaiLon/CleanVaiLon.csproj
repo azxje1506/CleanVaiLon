@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- .NET Framework 4.8: có sẵn trong Windows 10/11, nên exe chỉ vài trăm KB và không cần cài runtime.
+       Cũng là nền mà bản PowerShell 5.1 chạy, nên WinForms vẽ giống hệt. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
+    <UseWindowsForms>true</UseWindowsForms>
+    <RootNamespace>CleanVaiLon</RootNamespace>
+    <AssemblyName>CleanVaiLon</AssemblyName>
+    <ApplicationIcon>..\..\CleanVaiLon.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AssemblyTitle>Clean VaiLon</AssemblyTitle>
+    <Description>Kiểm tra và dọn dẹp máy Windows</Description>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
+  </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\CleanVaiLon.ico" LogicalName="CleanVaiLon.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="Microsoft.VisualBasic" />
+    <Reference Include="System.Management" />
+    <Reference Include="System.Web.Extensions" />
+    <Reference Include="System.ServiceProcess" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="CleanVaiLon.Tests" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,5 @@
+# Script Windows giữ xuống dòng CRLF; .ps1 có BOM UTF-8 để PowerShell 5.1 đọc đúng tiếng Việt.
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.md  text eol=lf
+*.ico binary

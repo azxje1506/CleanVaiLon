@@ -1,0 +1,6 @@
+# Lối tắt chứa đường dẫn riêng của từng máy – tạo lại bằng CreateShortcut.ps1
+*.lnk
+
+# Rác của Windows
+Thumbs.db
+desktop.ini

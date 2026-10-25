@@ -26,20 +26,26 @@ Công cụ kiểm tra và dọn dẹp máy Windows, giao diện tối kiểu ter
 - Tắt khởi động là đảo ngược được; dịch vụ chỉ chuyển sang "chạy khi cần", không bị vô hiệu hoá.
 - Không gửi dữ liệu đi đâu cả: công cụ **không kết nối Internet**.
 
-## Cài đặt và chạy
+## Cài đặt
 
-1. Tải về: nút **Code → Download ZIP**, giải nén vào một thư mục cố định (ví dụ `D:\Tools\CleanVaiLon`).
-2. Bỏ đánh dấu "tải từ Internet" để Windows không chặn script (chỉ cần làm một lần), mở PowerShell trong thư mục đó và chạy:
-   ```powershell
-   Get-ChildItem -Recurse | Unblock-File
-   ```
-3. Bấm đúp **`CleanVaiLon.bat`**, chọn **Yes** khi Windows hỏi quyền quản trị.
-4. (Tuỳ chọn) Tạo lối tắt có icon trên Desktop và Start Menu:
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File .\CreateShortcut.ps1
-   ```
+Tải ở trang **[Releases](https://github.com/azxje1506/CleanVaiLon/releases/latest)**:
 
-**Yêu cầu:** Windows 10 hoặc 11, Windows PowerShell 5.1 (có sẵn). Nên chạy với quyền quản trị để đọc đủ thông tin (Prefetch, dịch vụ, tác vụ).
+- **`CleanVaiLon-Setup-<phiên bản>.exe`** – bộ cài: có lối tắt trong Start Menu, gỡ được trong *Cài đặt → Ứng dụng*.
+- **`CleanVaiLon-<phiên bản>-portable.zip`** – giải nén là chạy, đọc `READ FIRST.txt`.
+- **`SHA256SUMS`** – để kiểm tra tệp tải về.
+
+Nếu SmartScreen hiện *"Windows protected your PC"*, bấm **More info → Run anyway** (bộ cài chưa được ký số). Khi mở, công cụ xin quyền quản trị để đọc đủ thông tin – bấm **Yes**.
+
+**Yêu cầu:** Windows 10 / 11 (64-bit), Windows PowerShell 5.1 có sẵn trong Windows.
+
+Chi tiết cài đặt, bản portable và cách gỡ: **[docs/install.md](docs/install.md)**.
+
+## Tài liệu
+
+- [Hướng dẫn sử dụng](docs/user-guide.md) – từng trang, từng nút, đánh giá an toàn khi xoá
+- [Cài đặt và gỡ bỏ](docs/install.md)
+- [Quy trình phát hành](docs/release-checklist.md)
+- [Đóng góp](CONTRIBUTING.md) · [Bảo mật](SECURITY.md) · [Lịch sử thay đổi](CHANGELOG.md)
 
 ## Vì sao phần mềm diệt virus có thể cảnh báo?
 
@@ -85,7 +91,7 @@ Các bài kiểm thử chỉ đọc thông tin, không thay đổi gì trên má
 
 **Safety:** never deletes permanently – items only go to the Recycle Bin, and items too large for it are skipped. Every file/folder gets a *safe / review / shouldn't delete / blocked* rating; system locations are blocked. Every change asks for confirmation and is logged. The tool makes no network requests.
 
-**Run:** download the ZIP, extract it, run `Get-ChildItem -Recurse | Unblock-File` in that folder once, then double-click `CleanVaiLon.bat` and accept the admin prompt. `CreateShortcut.ps1` adds Desktop and Start Menu shortcuts.
+**Install:** grab `CleanVaiLon-Setup-<version>.exe` (installer with Start Menu shortcut and uninstaller) or `CleanVaiLon-<version>-portable.zip` from [Releases](https://github.com/azxje1506/CleanVaiLon/releases/latest), and verify it against `SHA256SUMS`. The installer is not code-signed, so SmartScreen may ask you to confirm (*More info → Run anyway*). Details: [docs/install.md](docs/install.md) (Vietnamese).
 
 **Antivirus warnings:** because it reads browser extension manifests, Prefetch/UserAssist and network connections, edits startup entries and can register a logon task, some antivirus products may flag it as a false positive. See the table above for what each behavior is used for – all source code is here to review.
 

@@ -1,0 +1,59 @@
+name: Release
+
+# Pushing a tag such as v1.3.0 builds the installer, the portable zip and SHA256SUMS,
+# then publishes them as a GitHub release.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ github.ref_name }}
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tag must match $AppVersion
+        shell: powershell
+        run: |
+          $src = Get-Content .\CleanVaiLon.ps1 -Raw -Encoding UTF8
+          $ver = [regex]::Match($src, "\`$AppVersion = '([^']+)'").Groups[1].Value
+          if ("v$ver" -ne $env:TAG) { "Tag $env:TAG does not match AppVersion $ver"; exit 1 }
+
+      - name: Safe-delete rules
+        shell: powershell
+        run: .\tests\Test-Safety.ps1
+
+      - name: Install Inno Setup
+        shell: powershell
+        run: choco install innosetup -y --no-progress
+
+      - name: Build installer, portable zip and checksums
+        shell: powershell
+        run: .\tools\Build-Release.ps1
+
+      - name: Release notes from CHANGELOG
+        shell: powershell
+        run: |
+          $ver = $env:TAG.TrimStart('v')
+          $log = Get-Content .\CHANGELOG.md -Raw -Encoding UTF8
+          $m = [regex]::Match($log, "(?ms)^## $([regex]::Escape($ver))\b[^\n]*\n(.*?)(?=^## |\z)")
+          $notes = if ($m.Success) { $m.Groups[1].Value.Trim() } else { "Clean VaiLon $ver" }
+          # Keep this text ASCII: Windows PowerShell 5.1 may read the generated step script with the ANSI code page.
+          $notes += "`n`n**Install:** download ``CleanVaiLon-Setup-$ver.exe`` and run it. If SmartScreen blocks it, choose *More info -> Run anyway*.`n**Portable:** download ``CleanVaiLon-$ver-portable.zip`` and read ``READ FIRST.txt``.`n**Verify:** compare ``Get-FileHash <file>`` with ``SHA256SUMS``.`n`nGuide (Vietnamese): docs/user-guide.md"
+          [IO.File]::WriteAllText("$PWD\dist\RELEASE_NOTES.md", $notes, (New-Object Text.UTF8Encoding($false)))
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Clean VaiLon ${{ github.ref_name }}
+          body_path: dist/RELEASE_NOTES.md
+          files: |
+            dist/CleanVaiLon-Setup-*.exe
+            dist/CleanVaiLon-*-portable.zip
+            dist/SHA256SUMS

@@ -4,3 +4,6 @@
 # Rác của Windows
 Thumbs.db
 desktop.ini
+
+# Bản đóng gói (tạo bằng tools\Build-Release.ps1)
+dist/

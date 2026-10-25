@@ -152,8 +152,22 @@ namespace CleanVaiLon
             UpdateBound();
         }
 
+        // Nút chỉ hiện khi điều kiện đúng (ví dụ chỉ hiện "tắt" khi có mục đang bật được chọn).
+        static readonly List<KeyValuePair<Button, Func<bool>>> Shown = new List<KeyValuePair<Button, Func<bool>>>();
+
+        public static void BindVisible(Button b, Func<bool> cond)
+        {
+            Shown.Add(new KeyValuePair<Button, Func<bool>>(b, cond));
+            UpdateBound();
+        }
+
         public static void UpdateBound()
         {
+            foreach (var x in Shown)
+            {
+                bool show; try { show = x.Value(); } catch { show = true; }
+                if (x.Key.Visible != show) x.Key.Visible = show;
+            }
             foreach (var x in Bound)
             {
                 var b = x.Key; var tag = (BtnTag)b.Tag;

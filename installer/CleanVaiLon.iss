@@ -25,6 +25,8 @@ VersionInfoVersion={#MyAppVersion}
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 DefaultDirName={autopf}\CleanVaiLon
+; Always show the "Select Destination Location" page so you can install to another drive.
+DisableDirPage=no
 DisableProgramGroupPage=yes
 LicenseFile=..\LICENSE
 SetupIconFile=..\CleanVaiLon.ico

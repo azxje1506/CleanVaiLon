@@ -34,6 +34,9 @@ namespace CleanVaiLon {
   public class BorderlessForm : Form {
     public int Grip = 6;
     public BorderlessForm() { FormBorderStyle = FormBorderStyle.None; DoubleBuffered = true; }
+    [DllImport("user32.dll")] static extern bool IsIconic(IntPtr h);
+    // Khi thu nhỏ, Windows co vùng cửa sổ về 0; bỏ qua lần sắp xếp lại bố cục đó để lúc mở lại không phải xếp lại cả giao diện.
+    protected override void OnResize(EventArgs e) { if (IsHandleCreated && IsIconic(Handle)) return; base.OnResize(e); }
     public void SetMaximizedBounds(System.Drawing.Rectangle r) { MaximizedBounds = r; }
     protected override CreateParams CreateParams {
       get { var cp = base.CreateParams; cp.ClassStyle |= 0x20000; cp.Style |= 0x00020000 | 0x00010000; return cp; }
@@ -106,6 +109,8 @@ namespace CleanVaiLon {
     public DNode Root; public DNode Selected; public int MaxDepth = 3;
     public System.Drawing.Color Line = System.Drawing.Color.FromArgb(20, 35, 27);
     public System.Drawing.Color Header = System.Drawing.Color.FromArgb(160, 200, 180);
+    // Chữ hiển thị cho một nút (giao diện thay bằng bản dịch, ví dụ "[N tệp nhỏ]").
+    public static Func<string, string> Label = x => x;
     public event Action<DNode> NodeClicked;
     public event Action<DNode> NodeOpened;
     public event Action<DNode> NodeHover;
@@ -168,7 +173,7 @@ namespace CleanVaiLon {
       using (var p = new System.Drawing.Pen(System.Drawing.Color.FromArgb(7, 11, 9))) g.DrawRectangle(p, r.X, r.Y, r.Width, r.Height);
       if (r.Width > 46 && r.Height > 16) {
         var fg = n.IsDir || n.Ext == "*" ? System.Drawing.Color.FromArgb(200, 225, 210) : System.Drawing.Color.FromArgb(14, 16, 15);
-        TextRenderer.DrawText(g, n.Name + (n.IsDir ? "\\" : ""), Font, new System.Drawing.Rectangle((int)r.X + 3, (int)r.Y + 2, (int)r.Width - 6, 14), fg, flags);
+        TextRenderer.DrawText(g, Label(n.Name) + (n.IsDir ? "\\" : ""), Font, new System.Drawing.Rectangle((int)r.X + 3, (int)r.Y + 2, (int)r.Width - 6, 14), fg, flags);
         if (r.Height > 32) TextRenderer.DrawText(g, Fmt(n.Size), Font, new System.Drawing.Rectangle((int)r.X + 3, (int)r.Y + 16, (int)r.Width - 6, 14), fg, flags);
       }
     }

@@ -88,7 +88,8 @@ namespace CleanVaiLon
             }
             if (col.B)
             {
-                var fc = BadgeColor(text);
+                // Màu theo chữ gốc tiếng Việt (giữ trong Tag), chữ hiển thị có thể đã được dịch.
+                var fc = BadgeColor(e.SubItem.Tag as string ?? text);
                 var sz = TextRenderer.MeasureText(g, text, Theme.Small, new Size(1000, 30), TextFormatFlags.NoPadding);
                 int w = Math.Min(sz.Width + 12, b.Right - x - 4);
                 var r = new Rectangle(x, b.Top + (b.Height - 19) / 2, w, 18);
@@ -225,11 +226,13 @@ namespace CleanVaiLon
                 {
                     var c = cols[i];
                     object v = c.P(it);
-                    string text = c.F != null ? c.F(v) : Str(v);
+                    string raw = c.F != null ? c.F(v) : Str(v);
+                    string text = c.N ? raw : Lang.D(raw);
                     ListViewItem.ListViewSubItem sub;
                     if (i == 0) { li = new ListViewItem(text ?? ""); sub = li.SubItems[0]; }
                     else sub = li.SubItems.Add(text ?? "");
                     if (c.N) sub.Tag = Num(v);
+                    else if (c.B) sub.Tag = raw;
                 }
                 li.Tag = it;
                 if (toneOf != null) li.Name = toneOf(it) ?? "";
@@ -254,7 +257,7 @@ namespace CleanVaiLon
                 string s;
                 if (v is DateTime d) s = d.ToString("dd/MM/yyyy HH:mm");
                 else if (p.Item1 == "Kích thước" || p.Item1 == "Dung lượng") s = Fmt.Size(Num(v));
-                else s = Str(v);
+                else s = Lang.D(Str(v));
                 lines.Add(string.Format("{0,-14} {1}", Lang.Tr(p.Item1.ToLower()) + ":", s));
             }
             tb.Text = string.Join("\r\n", lines);

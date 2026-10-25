@@ -38,6 +38,7 @@ namespace CleanVaiLon
                 if (r == null) return;
                 ShowDetail(pgSec.Detail, new[] { P("Mức", r.Level), P("Nhóm", r.Group), P("Mục", r.Item), P("Chi tiết", r.Detail) });
             };
+            LangHooks.Add(() => { if (SecData.Count > 0) { RefreshSecList(); pgSec.Detail.Text = T("Bấm một dòng để xem chi tiết.", "Click a row to see details."); } });
         }
 
         void RefreshSecList()
@@ -54,18 +55,18 @@ namespace CleanVaiLon
             var list = rows.ToList();
             Fill(pgSec.List, list, o => { var x = (SecRow)o; return x.Level == "Cao" ? "bad" : x.Level == "Trung bình" ? "warn" : null; });
             int hi = SecData.Count(x => x.Level == "Cao"), mid = SecData.Count(x => x.Level == "Trung bình");
-            pgSec.SetTitle(list.Count, "[cao " + hi + " · cần xem " + mid + "]");
+            pgSec.SetTitle(list.Count, "[" + T("cao", "high") + " " + hi + " · " + T("cần xem", "to review") + " " + mid + "]");
         }
 
         void LoadSec()
         {
             StartWork("Kiểm tra bảo mật", () => Security.Report(), (r, err) =>
             {
-                if (!(r is List<SecRow> list)) { ShowInfo("Không kiểm tra được. " + err); return; }
+                if (!(r is List<SecRow> list)) { ShowInfo(T("Không kiểm tra được. ", "Could not check. ") + err); return; }
                 var order = new List<string> { "Cao", "Trung bình", "Thấp", "Thông tin" };
                 SecData = list.OrderBy(x => order.IndexOf(x.Level)).ThenBy(x => x.Group, StringComparer.CurrentCultureIgnoreCase).ThenBy(x => x.Item, StringComparer.CurrentCultureIgnoreCase).ToList();
                 RefreshSecList();
-                pgSec.Detail.Text = "Bấm một dòng để xem chi tiết.";
+                pgSec.Detail.Text = T("Bấm một dòng để xem chi tiết.", "Click a row to see details.");
             });
         }
 
@@ -85,41 +86,53 @@ namespace CleanVaiLon
             Ui.NewBtn(pgBak.Act, "chép thư mục…", (s, e) => CopyFolder(), true);
             Ui.NewBtn(pgBak.Act, "mở file history", (s, e) => Shell("control.exe", "/name Microsoft.FileHistory"));
             Ui.NewBtn(pgBak.Act, "⟳ kiểm tra", (s, e) => LoadBackup());
+            LangHooks.Add(() => { if (BakData != null) ShowBackup(); });
+        }
+
+        List<BackupRow> BakData;
+
+        void ShowBackup()
+        {
+            var list = BakData;
+            Fill(pgBak.List, list, o => { var x = (BackupRow)o; return x.Status == "Chưa có" || x.Status == "Chưa bật" ? "bad" : null; });
+            int has = list.Count(x => (x.Status == "Có" || x.Status == "Đã bật" || x.Status == "Đã đăng nhập") && !x.Item.StartsWith("Phần mềm", StringComparison.OrdinalIgnoreCase));
+            pgBak.SetTitle(list.Count, has > 0 ? string.Format(T("[có {0} hình thức]", "[{0} methods]"), has) : T("[chưa có sao lưu]", "[no backup yet]"));
+            pgBak.Detail.Text = T(@"Mẹo: muốn File History sao lưu cả thư mục ngoài Documents (ví dụ E:\Works), chuột phải thư mục đó > Show more options > Include in library > Documents.",
+                                  @"Tip: to have File History back up a folder outside Documents (for example E:\Works), right-click that folder > Show more options > Include in library > Documents.");
         }
 
         void LoadBackup()
         {
             StartWork("Kiểm tra sao lưu", () => Backup.Status(), (r, err) =>
             {
-                if (!(r is List<BackupRow> list)) { ShowInfo("Không kiểm tra được. " + err); return; }
-                Fill(pgBak.List, list, o => { var x = (BackupRow)o; return x.Status == "Chưa có" || x.Status == "Chưa bật" ? "bad" : null; });
-                int has = list.Count(x => (x.Status == "Có" || x.Status == "Đã bật" || x.Status == "Đã đăng nhập") && !x.Item.StartsWith("Phần mềm", StringComparison.OrdinalIgnoreCase));
-                pgBak.SetTitle(list.Count, has > 0 ? "[có " + has + " hình thức]" : "[chưa có sao lưu]");
-                pgBak.Detail.Text = @"Mẹo: muốn File History sao lưu cả thư mục ngoài Documents (ví dụ E:\Works), chuột phải thư mục đó > Show more options > Include in library > Documents.";
+                if (!(r is List<BackupRow> list)) { ShowInfo(T("Không kiểm tra được. ", "Could not check. ") + err); return; }
+                BakData = list;
+                ShowBackup();
             });
         }
 
         void CopyFolder()
         {
             string srcPath, dstPath;
-            using (var src = new FolderBrowserDialog { Description = "Chọn thư mục cần sao lưu" })
+            using (var src = new FolderBrowserDialog { Description = T("Chọn thư mục cần sao lưu", "Choose the folder to back up") })
             {
                 if (src.ShowDialog(this) != DialogResult.OK) return;
                 srcPath = src.SelectedPath;
             }
-            using (var dst = new FolderBrowserDialog { Description = "Chọn nơi lưu bản sao (nên là ổ khác)" })
+            using (var dst = new FolderBrowserDialog { Description = T("Chọn nơi lưu bản sao (nên là ổ khác)", "Choose where to save the copy (preferably another drive)") })
             {
                 if (dst.ShowDialog(this) != DialogResult.OK) return;
                 dstPath = dst.SelectedPath;
             }
             if (string.Equals(dstPath.Substring(0, 1), srcPath.Substring(0, 1), StringComparison.OrdinalIgnoreCase))
-                if (!Confirm("Nơi lưu nằm cùng ổ với thư mục gốc – nếu ổ hỏng sẽ mất cả hai. Vẫn tiếp tục?")) return;
-            if (!Confirm("Chép\r\n  " + srcPath + "\r\nsang\r\n  " + dstPath + "\r\n\r\nChỉ thêm và cập nhật file, không xoá gì ở nơi lưu.")) return;
+                if (!Confirm(T("Nơi lưu nằm cùng ổ với thư mục gốc – nếu ổ hỏng sẽ mất cả hai. Vẫn tiếp tục?", "The destination is on the same drive as the source – if the drive fails you lose both. Continue anyway?"))) return;
+            if (!Confirm(string.Format(T("Chép\r\n  {0}\r\nsang\r\n  {1}\r\n\r\nChỉ thêm và cập nhật file, không xoá gì ở nơi lưu.",
+                                         "Copy\r\n  {0}\r\nto\r\n  {1}\r\n\r\nFiles are only added and updated; nothing is deleted at the destination."), srcPath, dstPath))) return;
             StartWork("Chép thư mục", () => Backup.CopyFolder(srcPath, dstPath), (r, err) =>
             {
-                if (!(r is CopyResult c)) { ShowInfo("Có lỗi. " + err); return; }
+                if (!(r is CopyResult c)) { ShowInfo(T("Có lỗi. ", "Something went wrong. ") + err); return; }
                 Log.Write("Sao lưu: " + c.Dest + " | mã " + c.Code);
-                string head = c.Ok ? "Đã chép xong vào " + c.Dest + "." : "Chép có lỗi (mã " + c.Code + ").";
+                string head = c.Ok ? string.Format(T("Đã chép xong vào {0}.", "Copied to {0}."), c.Dest) : string.Format(T("Chép có lỗi (mã {0}).", "The copy had errors (code {0})."), c.Code);
                 ShowInfo(head + "\r\n\r\n" + c.Summary);
                 LoadBackup();
             });
@@ -133,15 +146,16 @@ namespace CleanVaiLon
             pgLog = NewPage("log", "nhật ký", "Mọi thay đổi công cụ đã làm trên máy: tắt/bật khởi động, chuyển vào Thùng rác, gỡ ứng dụng, sao lưu.");
             Create(pgLog, new[]
             {
-                new Col("thời gian", 170, r => ((LogRow)r).Time) { M = true },
+                new Col("thời gian", 200, r => ((LogRow)r).Time) { M = true },
                 new Col("nội dung", 900, r => ((LogRow)r).Text),
             }, false);
             Ui.NewBtn(pgLog.Act, "mở bằng notepad", (s, e) =>
             {
-                if (File.Exists(AppInfo.LogFile)) Shell("notepad.exe", "\"" + AppInfo.LogFile + "\""); else ShowInfo("Chưa có thao tác nào được ghi lại.");
+                if (File.Exists(AppInfo.LogFile)) Shell("notepad.exe", "\"" + AppInfo.LogFile + "\""); else ShowInfo(T("Chưa có thao tác nào được ghi lại.", "Nothing has been logged yet."));
             });
             Ui.NewBtn(pgLog.Act, "⟳ tải lại", (s, e) => LoadLog(), true);
             pgLog.Auto = LoadLog;
+            LangHooks.Add(() => { if (pgLog.Loaded) LoadLog(); });
         }
 
         void LoadLog()
@@ -157,7 +171,7 @@ namespace CleanVaiLon
             rows.Reverse();
             Fill(pgLog.List, rows, null);
             pgLog.SetTitle(rows.Count, "");
-            pgLog.Detail.Text = "File nhật ký: " + AppInfo.LogFile;
+            pgLog.Detail.Text = T("File nhật ký: ", "Log file: ") + AppInfo.LogFile;
         }
 
         // ===== Cài đặt =====
@@ -197,7 +211,7 @@ namespace CleanVaiLon
             swLogon = Ui.NewSwitch(r, logonOn, on =>
             {
                 try { LogonTask.Set(on); }
-                catch (Exception ex) { Ui.SetSwitch(swLogon, !on); ShowInfo("Không đổi được: " + (ex.InnerException ?? ex).Message + "\r\n\r\nCần mở công cụ với quyền quản trị."); }
+                catch (Exception ex) { Ui.SetSwitch(swLogon, !on); ShowInfo(T("Không đổi được: ", "Could not change it: ") + (ex.InnerException ?? ex).Message + T("\r\n\r\nCần mở công cụ với quyền quản trị.", "\r\n\r\nOpen the tool with administrator rights.")); }
             });
 
             r = AddSettingRow("trang mở đầu");
@@ -226,7 +240,7 @@ namespace CleanVaiLon
             Ui.NewSwitch(r, Cfg.DoubleConfirm, on => { Cfg.DoubleConfirm = on; Cfg.Save(); });
 
             r = AddSettingRow("lưới nền");
-            Ui.NewSwitch(r, Cfg.Grid, on => { Cfg.Grid = on; Cfg.Save(); content.Invalidate(true); });
+            Ui.NewSwitch(r, Cfg.Grid, on => { Cfg.Grid = on; Cfg.Save(); ApplyGrid(); });
 
             r = AddSettingRow("thư mục dữ liệu");
             var dataLbl = Ui.NewText(r, AppInfo.DataDir);
@@ -242,10 +256,10 @@ namespace CleanVaiLon
             var resetBar = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, BackColor = Color.Transparent, Padding = new Padding(0, 14, 0, 0) };
             var btnReset = Ui.NewBtn(resetBar, "↺ KHÔI PHỤC MẶC ĐỊNH", (s, e) =>
             {
-                if (!Confirm("Đưa mọi cài đặt về mặc định? (Không ảnh hưởng tới các mục đã tắt khởi động hay đã xoá.)")) return;
+                if (!Confirm(T("Đưa mọi cài đặt về mặc định? (Không ảnh hưởng tới các mục đã tắt khởi động hay đã xoá.)", "Reset all settings to defaults? (Startup items you disabled and things you deleted are not affected.)"))) return;
                 Cfg.ResetToDefaults();
                 Cfg.Save();
-                ShowInfo("Đã khôi phục mặc định. Mở lại công cụ để áp dụng hết.");
+                ShowInfo(T("Đã khôi phục mặc định. Mở lại công cụ để áp dụng hết.", "Settings reset to defaults. Reopen the tool to apply everything."));
             });
             btnReset.Margin = new Padding(0);
             btnReset.ForeColor = Theme.Red; btnReset.FlatAppearance.BorderColor = Theme.Red;

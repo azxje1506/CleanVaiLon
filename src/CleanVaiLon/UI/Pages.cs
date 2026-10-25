@@ -13,6 +13,20 @@ namespace CleanVaiLon
     {
         static string FmtSize(object v) { double d = Num(v); return d != 0 ? Fmt.Size(d) : ""; }
         static string FmtDate(object v) => v is DateTime d ? d.ToString("dd/MM/yyyy") : "";
+        static string T(string vi, string en) => Lang.T(vi, en);
+        static string D(string s) => Lang.D(s);
+
+        static string RecycledMessage(double freed) =>
+            string.Format(T("Đã chuyển {0} vào Thùng rác. Dọn Thùng rác để lấy lại dung lượng.", "Moved {0} to the Recycle Bin. Empty the Recycle Bin to get the space back."), Fmt.Size(freed));
+
+        // Dòng giải thích "xoá được không" cho khung chi tiết, theo ngôn ngữ đang dùng.
+        static string SafetyText(string path, bool isDir)
+        {
+            var s = Safety.Get(path);
+            var lines = new List<string> { string.Format("{0,-14} {1} – {2}", T("xoá được?:", "deletable?:"), D(s.Label).ToUpper(), D(s.Why)) };
+            if (!isDir) foreach (var x in Safety.FileFacts(path)) lines.Add(string.Format("{0,-14} {1}", T("lưu ý:", "note:"), D(x)));
+            return string.Join("\r\n", lines);
+        }
 
         // ===== Hiệu năng =====
         Page pgPerf; Button tglPerf; PerfSnapshot PerfData;
@@ -42,6 +56,7 @@ namespace CleanVaiLon
                 ShowDetail(pgPerf.Detail, new[] { P("Chương trình", r.Name), P("Là gì", r.Explain), P("Hãng", r.Company), P("Đường dẫn", r.Path) });
             };
             LangHooks.Add(() => tglPerf.Text = Lang.Tr("chỉ hiện >") + " " + Cfg.HeavyPct + "%");
+            LangHooks.Add(() => { RefreshPerfList(); ShowPerfSummary(); });
         }
 
         void RefreshPerfList()
@@ -52,21 +67,30 @@ namespace CleanVaiLon
             var heavy = all.Where(r => r.CpuPct > lim || r.MemPct > lim).ToList();
             var rows = Ui.Chip(tglPerf).On ? heavy : all;
             Fill(pgPerf.List, rows, o => { var r = (PerfRow)o; return r.CpuPct > lim || r.MemPct > lim ? "warn" : null; });
-            pgPerf.SetTitle(all.Count, "[nặng " + heavy.Count + "]");
+            pgPerf.SetTitle(all.Count, "[" + T("nặng", "heavy") + " " + heavy.Count + "]");
         }
 
         void RunPerf()
         {
             StartWork("Đo hiệu năng", () => Perf.Snapshot(), (r, err) =>
             {
-                if (!(r is PerfSnapshot d)) { ShowInfo("Không đo được. " + err); return; }
+                if (!(r is PerfSnapshot d)) { ShowInfo(T("Không đo được. ", "Could not measure. ") + err); return; }
                 PerfData = d;
                 RefreshPerfList();
-                double commitPct = d.LimitGB != 0 ? Math.Round(d.CommitGB / d.LimitGB * 100) : 0;
-                string warn = commitPct >= 85 ? "\r\n! bộ nhớ ảo gần đầy – máy dễ giật. Đóng bớt ứng dụng hoặc tăng pagefile." : "";
-                pgPerf.Detail.Text = string.Format("cpu đang bận:   {0}%\r\nram còn trống:  {1} / {2} GB\r\nbộ nhớ ảo:      {3} / {4} GB ({5}%){6}",
-                    d.CpuLoad, Math.Round(d.FreeMB / 1024, 1), Math.Round(d.TotalMB / 1024, 1), d.CommitGB, d.LimitGB, commitPct, warn);
+                ShowPerfSummary();
             });
+        }
+
+        void ShowPerfSummary()
+        {
+            var d = PerfData;
+            if (d == null) return;
+            double commitPct = d.LimitGB != 0 ? Math.Round(d.CommitGB / d.LimitGB * 100) : 0;
+            string warn = commitPct >= 85 ? T("\r\n! bộ nhớ ảo gần đầy – máy dễ giật. Đóng bớt ứng dụng hoặc tăng pagefile.",
+                                             "\r\n! virtual memory is nearly full – the PC may stutter. Close some apps or enlarge the pagefile.") : "";
+            pgPerf.Detail.Text = string.Format(T("cpu đang bận:   {0}%\r\nram còn trống:  {1} / {2} GB\r\nbộ nhớ ảo:      {3} / {4} GB ({5}%){6}",
+                                                 "cpu busy:       {0}%\r\nfree ram:       {1} / {2} GB\r\nvirtual memory: {3} / {4} GB ({5}%){6}"),
+                d.CpuLoad, Math.Round(d.FreeMB / 1024, 1), Math.Round(d.TotalMB / 1024, 1), d.CommitGB, d.LimitGB, commitPct, warn);
         }
 
         // ===== Khởi động =====
@@ -89,6 +113,10 @@ namespace CleanVaiLon
             var on = Ui.NewBtn(pgStart.Act, "bật lại mục đã chọn", (s, e) => ApplyStartup(true));
             Ui.BindEnabled(off, () => pgStart.List.CheckedItems.Count > 0);
             Ui.BindEnabled(on, () => pgStart.List.CheckedItems.Count > 0);
+            // Chỉ hiện nút hợp với các mục đã chọn: "tắt" khi có mục đang bật, "bật lại" khi có mục đã tắt.
+            // Chưa chọn gì thì hiện cả hai (mờ) để bạn biết có hai thao tác.
+            Ui.BindVisible(off, () => { var c = Checked<StartupItem>(pgStart.List); return c.Count == 0 || c.Any(x => x.Enabled); });
+            Ui.BindVisible(on, () => { var c = Checked<StartupItem>(pgStart.List); return c.Count == 0 || c.Any(x => !x.Enabled); });
             Ui.NewBtn(pgStart.Act, "⟳ tải lại", (s, e) => LoadStartup());
             Ui.NewText(pgStart.Filter, "lọc:");
             chipStart = Ui.NewChipGroup(pgStart.Filter, new Dictionary<string, string>
@@ -101,6 +129,7 @@ namespace CleanVaiLon
                 if (r == null) return;
                 ShowDetail(pgStart.Detail, new[] { P("Tên", r.Name), P("Loại", r.Kind), P("Phạm vi", r.Scope), P("Gợi ý", r.Advice), P("Là gì", r.Note), P("Lệnh chạy", r.Command) });
             };
+            LangHooks.Add(() => { if (StartData.Count > 0) RefreshStartupList(); });
         }
 
         void RefreshStartupList()
@@ -115,7 +144,7 @@ namespace CleanVaiLon
                 case "svc": rows = rows.Where(x => x.Kind == Startup.KService); break;
             }
             Fill(pgStart.List, rows.ToList(), o => { var x = (StartupItem)o; return !x.Enabled ? "dim" : x.Advice == "Cần xác nhận" ? "bad" : null; });
-            pgStart.SetTitle(StartData.Count, "[đang bật " + StartData.Count(x => x.Enabled) + "]");
+            pgStart.SetTitle(StartData.Count, "[" + T("đang bật", "enabled") + " " + StartData.Count(x => x.Enabled) + "]");
         }
 
         void LoadStartup()
@@ -123,7 +152,7 @@ namespace CleanVaiLon
             var svc = ToolServices.Load();
             StartWork("Đọc danh sách khởi động", () => Startup.Items(svc), (r, err) =>
             {
-                if (!(r is List<StartupItem> list)) { ShowInfo("Không đọc được. " + err); return; }
+                if (!(r is List<StartupItem> list)) { ShowInfo(T("Không đọc được. ", "Could not read. ") + err); return; }
                 var order = new List<string> { "Cần xác nhận", "Có thể tắt", "Chưa rõ", "Nên giữ" };
                 StartData = list.OrderBy(x => !x.Enabled).ThenBy(x => order.IndexOf(x.Advice)).ThenBy(x => x.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
                 RefreshStartupList();
@@ -132,10 +161,14 @@ namespace CleanVaiLon
 
         void ApplyStartup(bool enable)
         {
-            var sel = Checked<StartupItem>(pgStart.List);
-            if (sel.Count == 0) { ShowInfo("Bạn tích chọn ít nhất một mục trước."); return; }
+            // Chỉ làm với mục cần đổi: "tắt" bỏ qua mục đã tắt, "bật lại" bỏ qua mục đang bật.
+            var sel = Checked<StartupItem>(pgStart.List).Where(x => x.Enabled != enable).ToList();
+            if (sel.Count == 0) { ShowInfo(T("Bạn tích chọn ít nhất một mục trước.", "Tick at least one item first.")); return; }
             string verb = enable ? "bật lại" : "tắt";
-            if (!Confirm(verb.ToUpper() + " khởi động cùng máy cho " + sel.Count + " mục sau?\r\n\r\n" + string.Join("\r\n", sel.Select(x => "• " + x.Name + "  (" + x.Kind + ")")))) return;
+            string list = string.Join("\r\n", sel.Select(x => "• " + x.Name + "  (" + D(x.Kind) + ")"));
+            string ask = enable ? T("BẬT LẠI khởi động cùng máy cho {0} mục sau?", "RE-ENABLE starting with Windows for these {0} items?")
+                                : T("TẮT khởi động cùng máy cho {0} mục sau?", "DISABLE starting with Windows for these {0} items?");
+            if (!Confirm(string.Format(ask, sel.Count) + "\r\n\r\n" + list)) return;
             int ok = 0; var fail = new List<string>();
             var svc = ToolServices.Load();
             foreach (var it in sel)
@@ -150,8 +183,9 @@ namespace CleanVaiLon
                 catch (Exception ex) { fail.Add("• " + it.Name + ": " + ex.Message); }
             }
             try { ToolServices.Save(svc); } catch { }
-            string msg = "Đã " + verb + " " + ok + " mục. Thay đổi có hiệu lực từ lần bật máy sau.";
-            if (fail.Count > 0) msg += "\r\n\r\nKhông làm được:\r\n" + string.Join("\r\n", fail);
+            string msg = string.Format(enable ? T("Đã bật lại {0} mục. Thay đổi có hiệu lực từ lần bật máy sau.", "Re-enabled {0} items. The change takes effect the next time Windows starts.")
+                                              : T("Đã tắt {0} mục. Thay đổi có hiệu lực từ lần bật máy sau.", "Disabled {0} items. The change takes effect the next time Windows starts."), ok);
+            if (fail.Count > 0) msg += T("\r\n\r\nKhông làm được:\r\n", "\r\n\r\nCould not change:\r\n") + string.Join("\r\n", fail);
             ShowInfo(msg);
             LoadStartup();
         }
@@ -178,10 +212,10 @@ namespace CleanVaiLon
             Ui.NewBtn(pgDisk.Act, "tìm ảnh trùng lặp", (s, e) =>
             {
                 var dr = SelectedDrives();
-                if (dr.Count == 0) { ShowInfo("Bạn chọn ít nhất một ổ."); return; }
+                if (dr.Count == 0) { ShowInfo(T("Bạn chọn ít nhất một ổ.", "Pick at least one drive.")); return; }
                 StartWork("Tìm ảnh trùng lặp", () => Disk.FindDuplicateImages(dr), (r, err) =>
                 {
-                    if (!(r is DupScan d)) { ShowInfo("Không quét được. " + err); return; }
+                    if (!(r is DupScan d)) { ShowInfo(T("Không quét được. ", "Could not scan. ") + err); return; }
                     DupData = d;
                     Ui.SelectChip(chipDisk, "Dups");
                     RefreshDiskList();
@@ -190,10 +224,10 @@ namespace CleanVaiLon
             Ui.NewBtn(pgDisk.Act, "⟳ quét dung lượng", (s, e) =>
             {
                 var dr = SelectedDrives();
-                if (dr.Count == 0) { ShowInfo("Bạn chọn ít nhất một ổ."); return; }
+                if (dr.Count == 0) { ShowInfo(T("Bạn chọn ít nhất một ổ.", "Pick at least one drive.")); return; }
                 StartWork("Quét ổ đĩa", () => Disk.Scan(dr), (r, err) =>
                 {
-                    if (!(r is DiskScan d)) { ShowInfo("Không quét được. " + err); return; }
+                    if (!(r is DiskScan d)) { ShowInfo(T("Không quét được. ", "Could not scan. ") + err); return; }
                     DiskData = d;
                     if (Ui.ChipKey(chipDisk) == "Dups") Ui.SelectChip(chipDisk, "TopFiles");
                     RefreshDiskList();
@@ -201,12 +235,21 @@ namespace CleanVaiLon
             }, true);
             pgDisk.SetTitle("–", "[chưa quét]");
             Ui.NewText(pgDisk.Filter, "ổ:");
-            foreach (var d in Disk.Drives())
+            var drives = Disk.Drives();
+            foreach (var d in drives)
             {
-                var t = Ui.NewToggle(pgDisk.Filter, d.Drive + " " + Fmt.Size(d.Free) + " trống", d.Size > 0, null);
+                var t = Ui.NewToggle(pgDisk.Filter, "", d.Size > 0, null);
                 Ui.Chip(t).Drive = d.Drive;
                 driveToggles.Add(t);
             }
+            void DriveTexts() { for (int i = 0; i < drives.Count; i++) driveToggles[i].Text = drives[i].Drive + " " + Fmt.Size(drives[i].Free) + T(" trống", " free"); }
+            DriveTexts();
+            LangHooks.Add(() =>
+            {
+                DriveTexts();
+                if (DiskData != null || DupData != null) RefreshDiskList();
+                else pgDisk.SetTitle("–", T("[chưa quét]", "[not scanned]"));
+            });
             Ui.NewText(pgDisk.Filter, "  xem:");
             chipDisk = Ui.NewChipGroup(pgDisk.Filter, new Dictionary<string, string>
             {
@@ -218,7 +261,7 @@ namespace CleanVaiLon
                 var it = Selected<DiskRow>(pgDisk.List);
                 if (it == null) return;
                 ShowDetail(pgDisk.Detail, new[] { P("Đường dẫn", it.Path), P("Kích thước", it.Size), P("Ngày sửa", it.Modified), P("Ghi chú", it.Note) });
-                pgDisk.Detail.Text += "\r\n" + Safety.FormatText(it.Path, Directory.Exists(it.Path));
+                pgDisk.Detail.Text += "\r\n" + SafetyText(it.Path, Directory.Exists(it.Path));
             };
             pgDisk.List.DoubleClick += (s, e) => { var r = Selected<DiskRow>(pgDisk.List); if (r != null) OpenLocation(r.Path); };
         }
@@ -235,32 +278,33 @@ namespace CleanVaiLon
             Fill(pgDisk.List, rows, o => ((DiskRow)o).Note != null && ((DiskRow)o).Note.StartsWith("Ở ổ khác", StringComparison.OrdinalIgnoreCase) ? "dim" : null);
             double total = rows.Sum(x => x.Size);
             pgDisk.SetTitle(rows.Count, "[" + Fmt.Size(total) + "]");
-            if (key == "Dups" && DupData == null) pgDisk.Detail.Text = "Bấm \"tìm ảnh trùng lặp\" để quét.";
-            else if (key != "Dups" && DiskData == null) pgDisk.Detail.Text = "Bấm \"quét dung lượng\" để bắt đầu.";
-            else if (key == "Dups") pgDisk.Detail.Text = "Đã so sánh " + DupData.Scanned + " ảnh. Bản được giữ là bản cũ nhất. Dòng mờ là bản ở ổ khác – có thể là bản sao lưu, nên giữ.";
-            else pgDisk.Detail.Text = rows.Count + " mục, tổng " + Fmt.Size(total) + ". Bấm đúp một dòng để mở vị trí.";
+            if (key == "Dups" && DupData == null) pgDisk.Detail.Text = T("Bấm \"tìm ảnh trùng lặp\" để quét.", "Click \"find duplicate images\" to scan.");
+            else if (key != "Dups" && DiskData == null) pgDisk.Detail.Text = T("Bấm \"quét dung lượng\" để bắt đầu.", "Click \"scan space\" to start.");
+            else if (key == "Dups") pgDisk.Detail.Text = string.Format(T("Đã so sánh {0} ảnh. Bản được giữ là bản cũ nhất. Dòng mờ là bản ở ổ khác – có thể là bản sao lưu, nên giữ.",
+                                                                       "Compared {0} images. The oldest copy is the one kept. Dimmed rows are on another drive – they may be backups, so keep them."), DupData.Scanned);
+            else pgDisk.Detail.Text = string.Format(T("{0} mục, tổng {1}. Bấm đúp một dòng để mở vị trí.", "{0} items, {1} in total. Double-click a row to open its location."), rows.Count, Fmt.Size(total));
         }
 
         void DiskRecycle()
         {
             var sel = Checked<DiskRow>(pgDisk.List);
-            if (sel.Count == 0) { ShowInfo("Bạn tích chọn ít nhất một mục trước."); return; }
+            if (sel.Count == 0) { ShowInfo(T("Bạn tích chọn ít nhất một mục trước.", "Tick at least one item first.")); return; }
             if (!ConfirmRecycle(sel.Select(x => Tuple.Create(x.Path, x.Size)))) return;
             var payload = sel.Select(x => Tuple.Create(x.Path, x.Mode)).ToList();
             StartWork("Chuyển vào Thùng rác", () => payload.Select(x => Recycle.Move(x.Item1, x.Item2)).ToList(), (r, err) =>
             {
-                if (!(r is List<RecycleResult> res)) { ShowInfo("Có lỗi. " + err); return; }
+                if (!(r is List<RecycleResult> res)) { ShowInfo(T("Có lỗi. ", "Something went wrong. ") + err); return; }
                 double freed = 0; var lines = new List<string>();
                 foreach (var x in res)
                 {
                     Log.Write("Thùng rác – " + x.Result + ": " + x.Path + " | " + x.Detail);
                     freed += x.Freed;
-                    lines.Add("• [" + x.Result + "] " + x.Path + " – " + x.Detail);
+                    lines.Add("• [" + D(x.Result) + "] " + x.Path + " – " + D(x.Detail));
                 }
                 var done = new HashSet<string>(res.Where(x => x.Result == "Đã chuyển" || x.Result == "Không còn").Select(x => x.Path), StringComparer.OrdinalIgnoreCase);
                 foreach (var li in pgDisk.List.Items.Cast<ListViewItem>().ToList())
                     if (li.Tag is DiskRow d && done.Contains(d.Path) && d.Mode == "Item") pgDisk.List.Items.Remove(li);
-                ShowInfo("Đã chuyển " + Fmt.Size(freed) + " vào Thùng rác. Dọn Thùng rác để lấy lại dung lượng.\r\n\r\n" + string.Join("\r\n", lines.Take(30)));
+                ShowInfo(RecycledMessage(freed) + "\r\n\r\n" + string.Join("\r\n", lines.Take(30)));
             });
         }
     }

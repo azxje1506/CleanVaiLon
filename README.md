@@ -1,6 +1,6 @@
 # Clean VaiLon
 
-Công cụ kiểm tra và dọn dẹp máy Windows, giao diện tối kiểu terminal. Viết bằng PowerShell + WinForms, **không cần cài thêm gì** – chạy được ngay trên Windows 10/11.
+Công cụ kiểm tra và dọn dẹp máy Windows, giao diện tối kiểu terminal. Là một chương trình Windows thật (`CleanVaiLon.exe`, C# WinForms trên .NET Framework 4.8 có sẵn trong Windows), **không cần cài thêm gì** – chạy được ngay trên Windows 10/11.
 
 > English version: [see below](#english).
 
@@ -31,12 +31,12 @@ Công cụ kiểm tra và dọn dẹp máy Windows, giao diện tối kiểu ter
 Tải ở trang **[Releases](https://github.com/azxje1506/CleanVaiLon/releases/latest)**:
 
 - **`CleanVaiLon-Setup-<phiên bản>.exe`** – bộ cài: có lối tắt trong Start Menu, gỡ được trong *Cài đặt → Ứng dụng*.
-- **`CleanVaiLon-<phiên bản>-portable.zip`** – giải nén là chạy, đọc `READ FIRST.txt`.
+- **`CleanVaiLon-<phiên bản>-portable.zip`** – giải nén rồi bấm đúp `CleanVaiLon.exe`.
 - **`SHA256SUMS`** – để kiểm tra tệp tải về.
 
 Nếu SmartScreen hiện *"Windows protected your PC"*, bấm **More info → Run anyway** (bộ cài chưa được ký số). Khi mở, công cụ xin quyền quản trị để đọc đủ thông tin – bấm **Yes**.
 
-**Yêu cầu:** Windows 10 / 11 (64-bit), Windows PowerShell 5.1 có sẵn trong Windows.
+**Yêu cầu:** Windows 10 / 11 (64-bit). .NET Framework 4.8 có sẵn trong Windows 10 (bản 1903 trở lên) và Windows 11.
 
 Chi tiết cài đặt, bản portable và cách gỡ: **[docs/install.md](docs/install.md)**.
 
@@ -58,8 +58,8 @@ Công cụ làm nhiều việc giống phần mềm hệ thống, nên một s�
 | Đọc kết nối mạng và bộ nhớ đệm DNS | Liệt kê chương trình đang kết nối Internet ở trang **Bảo mật** |
 | Sửa khoá `StartupApproved`, tác vụ, chế độ dịch vụ | Tắt / bật lại mục khởi động – chỉ khi bạn bấm |
 | Tạo tác vụ đăng nhập với quyền cao nhất | Chỉ khi bạn bật **Cài đặt → khởi động cùng Windows** |
-| Gọi API Windows qua `Add-Type` | Giao diện tối, thanh cuộn tự vẽ, bản đồ dung lượng |
-| Chạy PowerShell với `-ExecutionPolicy Bypass` | Để chạy script chưa được ký số |
+| Gọi API Windows (P/Invoke) | Giao diện tối, thanh cuộn tự vẽ, kiểm tra chữ ký số, đọc kết nối mạng |
+| Xin quyền quản trị khi mở (app manifest) | Đọc Prefetch, dịch vụ, tác vụ và mọi tiến trình |
 
 File tải từ Internet chưa được ký số nên Windows SmartScreen cũng có thể hiện "Windows protected your PC" – bấm **More info → Run anyway** nếu bạn tin mã nguồn.
 
@@ -68,14 +68,20 @@ File tải từ Internet chưa được ký số nên Windows SmartScreen cũng 
 - Cài đặt và nhật ký nằm ở `%LOCALAPPDATA%\CleanVaiLon`.
 - Gỡ bỏ: tắt **khởi động cùng Windows** trong trang Cài đặt (nếu đã bật), xoá thư mục công cụ và thư mục dữ liệu trên.
 
-## Kiểm thử
+## Build và kiểm thử
+
+Cần [.NET SDK 8](https://dotnet.microsoft.com/download) (chỉ để build; người dùng không cần).
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\tests\Test-Functions.ps1
-powershell -ExecutionPolicy Bypass -File .\tests\Test-Safety.ps1
+dotnet build src\CleanVaiLon -c Release
+dotnet test tests\CleanVaiLon.Tests --filter "Category!=Smoke"   # luật "xoá được?", định dạng tệp dữ liệu
+dotnet test tests\CleanVaiLon.Tests --filter "Category=Smoke"    # chạy từng phần xử lý trên máy thật – chỉ đọc
+.\tools\Build-Release.ps1                                        # exe + bộ cài + bản portable vào dist\
 ```
 
 Các bài kiểm thử chỉ đọc thông tin, không thay đổi gì trên máy.
+
+Bản PowerShell cũ (1.x) được giữ trong [`legacy/`](legacy/) cho tới khi bản C# được xác nhận chạy tốt.
 
 ## Giấy phép
 
@@ -85,7 +91,7 @@ Các bài kiểm thử chỉ đọc thông tin, không thay đổi gì trên má
 
 ## English
 
-**Clean VaiLon** is a Windows checkup and cleanup tool with a dark terminal-style UI, written in PowerShell + WinForms. Nothing to install – it runs on stock Windows 10/11 (PowerShell 5.1).
+**Clean VaiLon** is a Windows checkup and cleanup tool with a dark terminal-style UI, shipped as a native `CleanVaiLon.exe` (C# WinForms on .NET Framework 4.8, which is built into Windows). Nothing to install – it runs on stock Windows 10/11.
 
 **Pages:** Performance, Startup, Disks, Analyzer (WizTree-style treemap), Apps (last-used dates, uninstall), Security (read-only: Defender, firewall, unsigned processes, connections, risky browser extensions), Backup, Log, Settings (VI/EN UI language, start page, thresholds, start with Windows).
 

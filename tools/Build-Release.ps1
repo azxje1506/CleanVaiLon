@@ -2,17 +2,29 @@
 #   CleanVaiLon-Setup-<phiên bản>.exe   bộ cài (Inno Setup)
 #   CleanVaiLon-<phiên bản>-portable.zip bản giải nén là chạy
 #   SHA256SUMS                           mã băm để kiểm tra tệp tải về
-# Phiên bản lấy từ $AppVersion trong CleanVaiLon.ps1.
+# Phiên bản lấy từ <Version> trong Directory.Build.props. CleanVaiLon.exe được build bằng dotnet publish.
 param(
     [string]$Iscc,        # đường dẫn ISCC.exe; để trống thì tự tìm
+    [string]$Dotnet = 'dotnet',
     [switch]$SkipInstaller
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
-$src = Get-Content (Join-Path $root 'CleanVaiLon.ps1') -Raw -Encoding UTF8
-$ver = [regex]::Match($src, "\`$AppVersion = '([^']+)'").Groups[1].Value
-if (-not $ver) { throw 'Không đọc được $AppVersion trong CleanVaiLon.ps1' }
+[xml]$props = Get-Content (Join-Path $root 'Directory.Build.props') -Raw -Encoding UTF8
+$ver = "$($props.Project.PropertyGroup.Version)".Trim()
+if (-not $ver) { throw 'Không đọc được <Version> trong Directory.Build.props' }
 "Phiên bản: $ver"
+
+# CleanVaiLon.exe
+$publish = Join-Path $root 'publish'
+if (Test-Path $publish) { Remove-Item $publish -Recurse -Force }
+& $Dotnet publish (Join-Path $root 'src\CleanVaiLon\CleanVaiLon.csproj') -c Release -o $publish --nologo
+if ($LASTEXITCODE -ne 0) { throw "dotnet publish lỗi (mã $LASTEXITCODE)" }
+$exe = Join-Path $publish 'CleanVaiLon.exe'
+if (-not (Test-Path $exe)) { throw "Không thấy $exe" }
+$exeVer = (Get-Item $exe).VersionInfo.ProductVersion
+if (-not $exeVer.StartsWith($ver)) { throw "CleanVaiLon.exe có phiên bản $exeVer, không khớp $ver" }
+"Đã build: $exe"
 
 $dist = Join-Path $root 'dist'
 if (Test-Path $dist) { Remove-Item $dist -Recurse -Force }
@@ -21,20 +33,17 @@ New-Item $dist -ItemType Directory | Out-Null
 # Bản portable
 $stage = Join-Path $dist "CleanVaiLon-$ver"
 New-Item $stage -ItemType Directory | Out-Null
-foreach ($f in 'CleanVaiLon.ps1', 'CleanVaiLon.bat', 'CleanVaiLon.ico', 'CreateShortcut.ps1', 'LICENSE', 'README.md') {
-    Copy-Item (Join-Path $root $f) $stage
-}
+Copy-Item $exe $stage
+foreach ($f in 'LICENSE', 'README.md') { Copy-Item (Join-Path $root $f) $stage }
 @"
 Clean VaiLon $ver – ban portable
 
 1. Giai nen vao mot thu muc co dinh (vi du D:\Tools\CleanVaiLon).
-2. Mo PowerShell trong thu muc do va chay mot lan:
-       Get-ChildItem -Recurse | Unblock-File
-   (bo dau "tai tu Internet" de Windows khong chan script)
-3. Bam dup CleanVaiLon.bat, chon Yes khi Windows hoi quyen quan tri.
-4. Tuy chon: tao loi tat co icon
-       powershell -ExecutionPolicy Bypass -File .\CreateShortcut.ps1
+2. Bam dup CleanVaiLon.exe, chon Yes khi Windows hoi quyen quan tri.
+   Neu SmartScreen chan: More info -> Run anyway.
+3. Tuy chon: tao loi tat bang chuot phai CleanVaiLon.exe > Send to > Desktop.
 
+Can Windows 10/11 (.NET Framework 4.8 co san trong Windows).
 Huong dan day du: https://github.com/azxje1506/CleanVaiLon/blob/main/docs/user-guide.md
 "@ | Set-Content (Join-Path $stage 'READ FIRST.txt') -Encoding ASCII
 $zip = Join-Path $dist "CleanVaiLon-$ver-portable.zip"

@@ -7,3 +7,10 @@ desktop.ini
 
 # Bản đóng gói (tạo bằng tools\Build-Release.ps1)
 dist/
+
+# Build của .NET
+bin/
+obj/
+publish/
+*.user
+.vs/

@@ -1,0 +1,12 @@
+<Project>
+  <!-- Phiên bản duy nhất của Clean VaiLon: exe, bộ cài, bản portable và tag phát hành đều đọc từ đây. -->
+  <PropertyGroup>
+    <Version>2.0.0</Version>
+    <Authors>azxje1506</Authors>
+    <Product>Clean VaiLon</Product>
+    <Copyright>Copyright (c) azxje1506. MIT License.</Copyright>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+  </PropertyGroup>
+</Project>

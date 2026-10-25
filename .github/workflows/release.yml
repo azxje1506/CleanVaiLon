@@ -1,6 +1,6 @@
 name: Release
 
-# Pushing a tag such as v1.3.0 builds the installer, the portable zip and SHA256SUMS,
+# Pushing a tag such as v2.0.0 builds CleanVaiLon.exe, the installer, the portable zip and SHA256SUMS,
 # then publishes them as a GitHub release.
 on:
   push:
@@ -18,22 +18,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Tag must match $AppVersion
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Tag must match <Version> in Directory.Build.props
         shell: powershell
         run: |
-          $src = Get-Content .\CleanVaiLon.ps1 -Raw -Encoding UTF8
-          $ver = [regex]::Match($src, "\`$AppVersion = '([^']+)'").Groups[1].Value
-          if ("v$ver" -ne $env:TAG) { "Tag $env:TAG does not match AppVersion $ver"; exit 1 }
+          [xml]$p = Get-Content .\Directory.Build.props -Raw -Encoding UTF8
+          $ver = "$($p.Project.PropertyGroup.Version)".Trim()
+          if ("v$ver" -ne $env:TAG) { "Tag $env:TAG does not match Version $ver"; exit 1 }
 
-      - name: Safe-delete rules
-        shell: powershell
-        run: .\tests\Test-Safety.ps1
+      - name: Unit tests
+        run: dotnet test tests/CleanVaiLon.Tests/CleanVaiLon.Tests.csproj -c Release --nologo --filter "Category!=Smoke"
 
       - name: Install Inno Setup
         shell: powershell
         run: choco install innosetup -y --no-progress
 
-      - name: Build installer, portable zip and checksums
+      - name: Build exe, installer, portable zip and checksums
         shell: powershell
         run: .\tools\Build-Release.ps1
 
@@ -45,7 +48,7 @@ jobs:
           $m = [regex]::Match($log, "(?ms)^## $([regex]::Escape($ver))\b[^\n]*\n(.*?)(?=^## |\z)")
           $notes = if ($m.Success) { $m.Groups[1].Value.Trim() } else { "Clean VaiLon $ver" }
           # Keep this text ASCII: Windows PowerShell 5.1 may read the generated step script with the ANSI code page.
-          $notes += "`n`n**Install:** download ``CleanVaiLon-Setup-$ver.exe`` and run it. If SmartScreen blocks it, choose *More info -> Run anyway*.`n**Portable:** download ``CleanVaiLon-$ver-portable.zip`` and read ``READ FIRST.txt``.`n**Verify:** compare ``Get-FileHash <file>`` with ``SHA256SUMS``.`n`nGuide (Vietnamese): docs/user-guide.md"
+          $notes += "`n`n**Install:** download ``CleanVaiLon-Setup-$ver.exe`` and run it. If SmartScreen blocks it, choose *More info -> Run anyway*.`n**Portable:** download ``CleanVaiLon-$ver-portable.zip``, unzip it and run ``CleanVaiLon.exe``.`n**Verify:** compare ``Get-FileHash <file>`` with ``SHA256SUMS``.`n`nGuide (Vietnamese): docs/user-guide.md"
           [IO.File]::WriteAllText("$PWD\dist\RELEASE_NOTES.md", $notes, (New-Object Text.UTF8Encoding($false)))
 
       - name: Publish release

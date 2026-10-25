@@ -45,6 +45,7 @@ namespace CleanVaiLon
 
             var drives = Disk.Drives();
             AnTarget = (drives.FirstOrDefault()?.Drive ?? "C:") + "\\";
+            Treemap.Label = Lang.D;
             treemap.NodeClicked += SelectAnNode;
             treemap.NodeOpened += OpenAnNode;
             treemap.NodeHover += n => { if (AnSel == null) ShowAnDetail(n); };
@@ -67,13 +68,19 @@ namespace CleanVaiLon
             Ui.NewBtn(pgAn.Act, "⟳ quét", (s, e) => StartAnScan());
             Ui.NewText(pgAn.Filter, "quét:");
             var anDrives = new Dictionary<string, string>();
-            foreach (var d in drives) anDrives[d.Drive + "\\"] = d.Drive + " " + Fmt.Size(d.Size - d.Free) + " đã dùng";
+            foreach (var d in drives) anDrives[d.Drive + "\\"] = d.Drive + " " + Fmt.Size(d.Size - d.Free) + T(" đã dùng", " used");
             chipAn = Ui.NewChipGroup(pgAn.Filter, anDrives, k => { AnTarget = k; StartAnScan(); });
+            LangHooks.Add(() =>
+            {
+                for (int i = 0; i < drives.Count && i < chipAn.Count; i++) chipAn[i].Text = drives[i].Drive + " " + Fmt.Size(drives[i].Size - drives[i].Free) + T(" đã dùng", " used");
+                if (AnCur != null) ShowAnFolder(AnCur);
+                else pgAn.SetTitle("–", T("[chưa quét – chọn một ổ để bắt đầu]", "[not scanned – pick a drive to start]"));
+            });
             var pick = Ui.NewChipButton(pgAn.Filter, "chọn thư mục…", new ChipTag());
             Ui.SetChipState(pick, false);
             pick.Click += (s, e) =>
             {
-                using (var dlg = new FolderBrowserDialog { Description = "Chọn thư mục cần phân tích" })
+                using (var dlg = new FolderBrowserDialog { Description = T("Chọn thư mục cần phân tích", "Choose the folder to analyze") })
                 {
                     if (dlg.ShowDialog(this) != DialogResult.OK) return;
                     foreach (var o in chipAn) Ui.SetChipState(o, false);
@@ -85,12 +92,12 @@ namespace CleanVaiLon
             Ui.SetChipState(check, false);
             check.Click += (s, e) =>
             {
-                using (var dlg = new OpenFileDialog { Title = "Chọn tệp cần kiểm tra xoá được không", Filter = "Mọi tệp (*.*)|*.*" })
+                using (var dlg = new OpenFileDialog { Title = T("Chọn tệp cần kiểm tra xoá được không", "Choose a file to check whether it can be deleted"), Filter = T("Mọi tệp (*.*)|*.*", "All files (*.*)|*.*") })
                 {
                     if (dlg.ShowDialog(this) != DialogResult.OK) return;
                     string p = dlg.FileName;
                     long size = 0; try { size = new FileInfo(p).Length; } catch { }
-                    ShowInfo(string.Format("{0}\r\n{1}\r\n\r\n{2}", p, Fmt.Size(size), Safety.FormatText(p, false)));
+                    ShowInfo(string.Format("{0}\r\n{1}\r\n\r\n{2}", p, Fmt.Size(size), SafetyText(p, false)));
                 }
             };
             Ui.NewText(pgAn.Filter, "   màu:");
@@ -108,10 +115,10 @@ namespace CleanVaiLon
         {
             if (n == null) { pgAn.Detail.Text = ""; return; }
             double pctRoot = AnRoot != null && AnRoot.Size != 0 ? (double)n.Size / AnRoot.Size * 100 : 0;
-            string kind = n.IsDir ? "thư mục – bấm đúp để đi vào" : n.Ext == "*" ? "các tệp dưới 1 MB gộp lại" : "tệp " + n.Ext;
-            string txt = string.Format("{0,-14} {1}\r\n{2,-14} {3}  ({4:N1}% của {5})\r\n{6,-14} {7:N0}\r\n{8,-14} {9}",
-                "đường dẫn:", n.Path, "dung lượng:", Fmt.Size(n.Size), pctRoot, AnRoot?.Path, "số tệp:", n.Files, "loại:", kind);
-            if (n.Ext != "*") txt += "\r\n" + Safety.FormatText(n.Path, n.IsDir);
+            string kind = n.IsDir ? T("thư mục – bấm đúp để đi vào", "folder – double-click to go inside") : n.Ext == "*" ? T("các tệp dưới 1 MB gộp lại", "files under 1 MB combined") : T("tệp ", "file ") + n.Ext;
+            string txt = string.Format(T("{0,-14} {1}\r\n{2,-14} {3}  ({4:N1}% của {5})\r\n{6,-14} {7:N0}\r\n{8,-14} {9}", "{0,-14} {1}\r\n{2,-14} {3}  ({4:N1}% of {5})\r\n{6,-14} {7:N0}\r\n{8,-14} {9}"),
+                T("đường dẫn:", "path:"), D(n.Path), T("dung lượng:", "size:"), Fmt.Size(n.Size), pctRoot, AnRoot?.Path, T("số tệp:", "files:"), n.Files, T("loại:", "type:"), kind);
+            if (n.Ext != "*") txt += "\r\n" + SafetyText(n.Path, n.IsDir);
             pgAn.Detail.Text = txt;
         }
 
@@ -129,7 +136,7 @@ namespace CleanVaiLon
             }).ToList();
             Fill(pgAn.List, rows, o => ((AnRow)o).Node.Ext == "*" ? "dim" : null);
             treemap.Root = node; treemap.Selected = null; treemap.Invalidate();
-            pgAn.SetTitle(Fmt.Size(node.Size), string.Format("[{0:N0} tệp]", node.Files));
+            pgAn.SetTitle(Fmt.Size(node.Size), string.Format(T("[{0:N0} tệp]", "[{0:N0} files]"), node.Files));
             ShowAnDetail(node);
             Ui.UpdateBound();
         }
@@ -157,10 +164,10 @@ namespace CleanVaiLon
             string target = AnTarget;
             StartWork("Phân tích dung lượng", () => DiskTree.Scan(target), (r, err) =>
             {
-                if (!(r is DNode root)) { ShowInfo("Không quét được. " + err); return; }
+                if (!(r is DNode root)) { ShowInfo(T("Không quét được. ", "Could not scan. ") + err); return; }
                 AnRoot = root;
                 ShowAnFolder(root);
-            }, () => string.Format("{0:N0} tệp · {1}", DiskTree.Scanned, DiskTree.Current));
+            }, () => string.Format(T("{0:N0} tệp · {1}", "{0:N0} files · {1}"), DiskTree.Scanned, DiskTree.Current));
         }
 
         // Các mục sẽ xoá: những dòng đã tích; nếu chưa tích dòng nào thì lấy mục đang chọn trên bản đồ.
@@ -179,12 +186,12 @@ namespace CleanVaiLon
             var paths = nodes.Select(n => n.Path).ToList();
             StartWork("Chuyển vào Thùng rác", () => paths.Select(p => Recycle.Move(p, "Item")).ToList(), (r, err) =>
             {
-                if (!(r is List<RecycleResult> res)) { ShowInfo("Có lỗi. " + err); return; }
+                if (!(r is List<RecycleResult> res)) { ShowInfo(T("Có lỗi. ", "Something went wrong. ") + err); return; }
                 double freed = 0; var lines = new List<string>();
                 foreach (var x in res)
                 {
                     Log.Write("Thùng rác – " + x.Result + ": " + x.Path + " | " + x.Detail);
-                    lines.Add("• [" + x.Result + "] " + x.Path + " – " + x.Detail);
+                    lines.Add("• [" + D(x.Result) + "] " + x.Path + " – " + D(x.Detail));
                     if (x.Result != "Đã chuyển") continue;
                     freed += x.Freed;
                     // Bỏ mục đã xoá khỏi cây và trừ dung lượng ở các thư mục cha.
@@ -194,7 +201,7 @@ namespace CleanVaiLon
                     for (var p = n.Parent; p != null; p = p.Parent) { p.Size -= n.Size; p.Files -= n.Files; }
                 }
                 ShowAnFolder(AnCur);
-                ShowInfo("Đã chuyển " + Fmt.Size(freed) + " vào Thùng rác. Dọn Thùng rác để lấy lại dung lượng.\r\n\r\n" + string.Join("\r\n", lines.Take(30)));
+                ShowInfo(RecycledMessage(freed) + "\r\n\r\n" + string.Join("\r\n", lines.Take(30)));
             });
         }
 
@@ -224,6 +231,7 @@ namespace CleanVaiLon
             Ui.NewText(pgApps.Filter, "tháng  ·");
             chipApps = Ui.NewChipGroup(pgApps.Filter, new Dictionary<string, string> { ["all"] = "tất cả", ["app"] = "ứng dụng", ["game"] = "game steam", ["sys"] = "hệ thống" }, k => RefreshAppsList());
             pgApps.Auto = LoadApps;
+            LangHooks.Add(RefreshAppsList);
             pgApps.List.SelectedIndexChanged += (s, e) =>
             {
                 var a = Selected<AppRow>(pgApps.List);
@@ -247,15 +255,16 @@ namespace CleanVaiLon
             var list = rows.OrderBy(x => x.Kind == Apps.KSystem).ThenByDescending(x => x.Size).ToList();
             Fill(pgApps.List, list, o => ((AppRow)o).Kind == Apps.KSystem ? "dim" : null);
             int old = AppsData.Count(x => x.Kind != Apps.KSystem && (!x.LastUsed.HasValue || x.LastUsed < cut));
-            pgApps.SetTitle(list.Count, "[lâu không dùng " + old + "]");
-            pgApps.Detail.Text = "Tích chọn rồi bấm \"gỡ mục đã chọn\". Trình gỡ của từng ứng dụng sẽ hiện ra để bạn xác nhận. Dòng mờ là thành phần hệ thống – nên giữ.";
+            pgApps.SetTitle(list.Count, "[" + T("lâu không dùng", "unused for long") + " " + old + "]");
+            pgApps.Detail.Text = T("Tích chọn rồi bấm \"gỡ mục đã chọn\". Trình gỡ của từng ứng dụng sẽ hiện ra để bạn xác nhận. Dòng mờ là thành phần hệ thống – nên giữ.",
+                                   "Tick apps, then click \"uninstall selected\". Each app's own uninstaller opens so you can confirm. Dimmed rows are system components – keep them.");
         }
 
         void LoadApps()
         {
             StartWork("Phân tích ứng dụng", () => Apps.Usage(), (r, err) =>
             {
-                if (!(r is List<AppRow> list)) { ShowInfo("Không đọc được. " + err); return; }
+                if (!(r is List<AppRow> list)) { ShowInfo(T("Không đọc được. ", "Could not read. ") + err); return; }
                 AppsData = list;
                 RefreshAppsList();
             });
@@ -264,15 +273,17 @@ namespace CleanVaiLon
         void UninstallSelected()
         {
             var sel = Checked<AppRow>(pgApps.List);
-            if (sel.Count == 0) { ShowInfo("Bạn tích chọn ít nhất một ứng dụng trước."); return; }
+            if (sel.Count == 0) { ShowInfo(T("Bạn tích chọn ít nhất một ứng dụng trước.", "Tick at least one app first.")); return; }
             int sys = sel.Count(x => x.Kind == Apps.KSystem);
-            string warn = sys > 0 ? "\r\n\r\n! Có " + sys + " mục là thành phần hệ thống, gỡ có thể làm game hoặc phần mềm khác lỗi." : "";
-            if (!Confirm("Gỡ " + sel.Count + " ứng dụng sau? Mỗi trình gỡ sẽ hiện cửa sổ để bạn xác nhận.\r\n\r\n" + string.Join("\r\n", sel.Select(x => "• " + x.Name)) + warn)) return;
+            string warn = sys > 0 ? string.Format(T("\r\n\r\n! Có {0} mục là thành phần hệ thống, gỡ có thể làm game hoặc phần mềm khác lỗi.",
+                                                    "\r\n\r\n! {0} of them are system components; removing them can break games or other software."), sys) : "";
+            if (!Confirm(string.Format(T("Gỡ {0} ứng dụng sau? Mỗi trình gỡ sẽ hiện cửa sổ để bạn xác nhận.", "Uninstall these {0} apps? Each uninstaller opens a window so you can confirm."), sel.Count)
+                         + "\r\n\r\n" + string.Join("\r\n", sel.Select(x => "• " + x.Name)) + warn)) return;
             StartWork("Gỡ ứng dụng", () => sel.Select(Apps.Uninstall).ToList(), (r, err) =>
             {
-                if (!(r is List<UninstallResult> res)) { ShowInfo("Có lỗi. " + err); return; }
+                if (!(r is List<UninstallResult> res)) { ShowInfo(T("Có lỗi. ", "Something went wrong. ") + err); return; }
                 foreach (var x in res) Log.Write("Gỡ – " + x.Result + ": " + x.Name + " | " + x.Detail);
-                ShowInfo("Kết quả:\r\n\r\n" + string.Join("\r\n", res.Select(x => "• [" + x.Result + "] " + x.Name + " " + x.Detail)));
+                ShowInfo(T("Kết quả:", "Result:") + "\r\n\r\n" + string.Join("\r\n", res.Select(x => "• [" + D(x.Result) + "] " + x.Name + " " + D(x.Detail))));
                 LoadApps();
             });
         }

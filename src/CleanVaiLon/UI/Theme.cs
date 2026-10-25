@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Text;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Windows.Forms;
 
 namespace CleanVaiLon
@@ -50,7 +51,7 @@ namespace CleanVaiLon
     }
 
     // Bảng dịch các chữ cố định của giao diện. Nội dung dữ liệu (giải thích, nhãn trạng thái) giữ tiếng Việt.
-    public static class Lang
+    public static partial class Lang
     {
         public static Settings Cfg;
         public static readonly Dictionary<string, string> Dict = new Dictionary<string, string>();
@@ -190,9 +191,79 @@ namespace CleanVaiLon
         {
             foreach (var p in Pairs) Dict[p[0]] = p[1];
             foreach (var kv in Dict) if (!DictRev.ContainsKey(kv.Value)) DictRev[kv.Value] = kv.Key;
+            foreach (var p in DataPairs) Data[p[0]] = p[1];
         }
 
         public static bool En => Cfg != null && Cfg.Lang == "en";
+
+        // Chữ do giao diện tự tạo (thông báo, tiêu đề phụ): chọn theo ngôn ngữ đang dùng.
+        public static string T(string vi, string en) => En ? en : vi;
+
+        // ----- Nội dung dữ liệu -----
+        // Dữ liệu luôn giữ tiếng Việt (bộ lọc so sánh theo chữ tiếng Việt, nhật ký ghi tiếng Việt);
+        // chỉ lúc hiển thị mới dịch, nên đổi ngôn ngữ là danh sách đổi theo ngay.
+        static readonly Dictionary<string, string> Data = new Dictionary<string, string>();
+
+        static readonly KeyValuePair<Regex, Func<Match, string>>[] Rules =
+        {
+            R(@"^Trong (.+), hơn 90 ngày$", m => "In " + m.Groups[1].Value + ", older than 90 days"),
+            R(@"^Ở ổ khác – có thể là bản sao lưu\. Giống hệt: (.+)$", m => "On another drive – may be a backup. Identical to: " + m.Groups[1].Value),
+            R(@"^Giống hệt: (.+)$", m => "Identical to: " + m.Groups[1].Value),
+            R(@"^Không thấy chạy từ (.+)$", m => "Not run since " + m.Groups[1].Value),
+            R(@"^\[(\d+) tệp nhỏ\]$", m => "[" + m.Groups[1].Value + " small files]"),
+            R(@"^Mã (-?\d+)$", m => "Code " + m.Groups[1].Value),
+            R(@"^\((.+)\) lớn hơn chỗ trống của Thùng rác\. Bạn tự xoá bằng Shift \+ Delete nếu chắc chắn\.$",
+                m => "(" + m.Groups[1].Value + ") is larger than the free space in the Recycle Bin. Delete it yourself with Shift + Delete if you are sure."),
+            R(@"^(\d+) file vào Thùng rác, (\d+) file đang dùng nên bỏ qua\.$", m => m.Groups[1].Value + " files moved to the Recycle Bin, " + m.Groups[2].Value + " in use were skipped."),
+            R(@"^không sửa từ (.+) \((.+) năm\)$", m => "not modified since " + m.Groups[1].Value + " (" + m.Groups[2].Value + " years)"),
+            // bảo mật
+            R(@"^Tường lửa tắt ở: (.+)$", m => "Firewall is off for: " + m.Groups[1].Value),
+            R(@"^Đang dùng: (.+)$", m => "In use: " + m.Groups[1].Value),
+            R(@"^Cập nhật lần cuối: (.*)$", m => "Last updated: " + m.Groups[1].Value),
+            R(@"^(Không có chữ ký số\.|Chữ ký số không hợp lệ \((\w+)\)\.) (.*)\. Đường dẫn: (.*)$",
+                m => (m.Groups[2].Success ? "Invalid digital signature (" + m.Groups[2].Value + ")." : "Not digitally signed.") + " " + m.Groups[3].Value + ". Path: " + m.Groups[4].Value),
+            R(@"^(.+) \((\d+) kết nối\)$", m => m.Groups[1].Value + " (" + m.Groups[2].Value + " connections)"),
+            R(@"^Tới: (.*?)\. (.*)$", m => "To: " + m.Groups[1].Value + ". " + m.Groups[2].Value),
+            R(@"^Cổng (.*?)\. (.*)$", m => "Port " + m.Groups[1].Value + ". " + m.Groups[2].Value),
+            R(@"^Proxy: (.*)\. Nếu bạn không tự đặt thì nên kiểm tra\.$", m => "Proxy: " + m.Groups[1].Value + ". If you didn't set it yourself, check it."),
+            R(@"^(Đang bật|Đang tắt) · (v.*?) · (.*) · ID (.*)$",
+                m => D(m.Groups[1].Value) + " · " + m.Groups[2].Value + " · " + string.Join("; ", m.Groups[3].Value.Split(new[] { "; " }, StringSplitOptions.None).Select(D)) + " · ID " + m.Groups[4].Value),
+            // sao lưu
+            R(@"^Lần cuối: (.+)$", m => "Last: " + m.Groups[1].Value),
+            R(@"^Lưu vào: (.*)\. Cấu hình cập nhật: (.*)$", m => "Saved to: " + m.Groups[1].Value + ". Settings updated: " + m.Groups[2].Value),
+            R(@"^(\d+) điểm$", m => m.Groups[1].Value + " points"),
+            R(@"^Mới nhất: (.*?) – (.*)\. Chỉ khôi phục được cài đặt Windows, không giữ file của bạn\.$",
+                m => "Latest: " + m.Groups[1].Value + " – " + m.Groups[2].Value + ". Only restores Windows settings, it does not keep your files."),
+            R(@"^(.*) – thư mục (.*)\. Đang chạy: (True|False)$", m => m.Groups[1].Value + " – folder " + m.Groups[2].Value + ". Running: " + m.Groups[3].Value),
+            R(@"^(.*) – (\d+) GB\. Có thể dùng làm nơi sao lưu\.$", m => m.Groups[1].Value + " – " + m.Groups[2].Value + " GB. Can be used as a backup target."),
+            // nhật ký
+            R(@"^Khởi động – (tắt|bật lại) : (.*?) \| (.*)$", m => "Startup – " + (m.Groups[1].Value == "tắt" ? "disable" : "re-enable") + " : " + D(m.Groups[2].Value) + " | " + m.Groups[3].Value),
+            R(@"^Thùng rác – (.*?): (.*) \| (.*)$", m => "Recycle Bin – " + D(m.Groups[1].Value) + ": " + m.Groups[2].Value + " | " + D(m.Groups[3].Value)),
+            R(@"^Gỡ – (.*?): (.*) \| (.*)$", m => "Uninstall – " + D(m.Groups[1].Value) + ": " + m.Groups[2].Value + " | " + D(m.Groups[3].Value)),
+            R(@"^Sao lưu: (.*) \| mã (-?\d+)$", m => "Backup: " + m.Groups[1].Value + " | code " + m.Groups[2].Value),
+        };
+
+        static KeyValuePair<Regex, Func<Match, string>> R(string pattern, Func<Match, string> f) =>
+            new KeyValuePair<Regex, Func<Match, string>>(new Regex(pattern, RegexOptions.Compiled), f);
+
+        // Dịch một giá trị dữ liệu để hiển thị. Không có trong bảng thì giữ nguyên (đường dẫn, tên chương trình…).
+        public static string D(string s)
+        {
+            if (!En || string.IsNullOrEmpty(s)) return s;
+            if (Data.TryGetValue(s, out var v)) return v;
+            foreach (var r in Rules)
+            {
+                var m = r.Key.Match(s);
+                if (m.Success) return r.Value(m);
+            }
+            return s;
+        }
+
+        // Có bản dịch trong bảng dữ liệu không (dùng cho kiểm thử).
+        public static bool HasData(string s) => s != null && Data.ContainsKey(s);
+
+        // Dịch cả bảng gốc giao diện lẫn dữ liệu (cho nhãn ngắn như tên việc chạy nền).
+        public static string Any(string s) => En && s != null && Dict.TryGetValue(s, out var v) ? v : D(s);
 
         public static string Tr(string s) => En && s != null && Dict.TryGetValue(s, out var v) ? v : s;
 

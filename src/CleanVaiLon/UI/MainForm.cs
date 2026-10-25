@@ -46,12 +46,7 @@ namespace CleanVaiLon
 
             content = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Bg };
             Ui.SetDoubleBuffer(content);
-            content.Paint += (s, e) =>
-            {
-                if (!Cfg.Grid) return;
-                for (int x = 0; x < content.Width; x += 28) e.Graphics.DrawLine(Theme.PenGrid, x, 0, x, content.Height);
-                for (int y = 0; y < content.Height; y += 28) e.Graphics.DrawLine(Theme.PenGrid, 0, y, content.Width, y);
-            };
+            ApplyGrid();
 
             side = new Panel { Dock = DockStyle.Left, Width = 196, BackColor = Theme.Side };
             side.Paint += (s, e) => e.Graphics.DrawLine(Theme.PenLine, side.Width - 1, 0, side.Width - 1, side.Height);
@@ -113,6 +108,7 @@ namespace CleanVaiLon
             BuildLog();
             LangHooks.Add(() => PlaceAdminTag());
             LangHooks.Add(() => { if (Jobs.Count == 0) lblState.Text = Lang.Tr("● SẴN SÀNG"); });
+            LangHooks.Add(() => { if (Jobs.Count > 0) UpdateBusy(); else if (lastDone != null) ShowLastDone(); });
             BuildSettings();
 
             Shown += (s, e) =>
@@ -131,6 +127,25 @@ namespace CleanVaiLon
             FormClosed += (s, e) => timer.Stop();
         }
 
+        // Lưới nền: một ô 28×28 có nét ở cạnh trên và trái, lát kín vùng nội dung (nhanh hơn vẽ từng đường mỗi lần).
+        static Bitmap gridTile;
+        void ApplyGrid()
+        {
+            if (gridTile == null)
+            {
+                gridTile = new Bitmap(28, 28);
+                using (var g = Graphics.FromImage(gridTile))
+                {
+                    g.Clear(Theme.Bg);
+                    g.DrawLine(Theme.PenGrid, 0, 0, 27, 0);
+                    g.DrawLine(Theme.PenGrid, 0, 0, 0, 27);
+                }
+            }
+            content.BackgroundImageLayout = ImageLayout.Tile;
+            content.BackgroundImage = Cfg.Grid ? gridTile : null;
+            content.Invalidate(true);
+        }
+
         void PlaceAdminTag() => adminTag.Location = new Point(top.Width - winButtons.Width - adminTag.Width - 12, 11);
 
         // ----- Chạy việc nặng ở luồng nền để giao diện không bị đơ -----
@@ -143,13 +158,17 @@ namespace CleanVaiLon
         readonly List<Job> Jobs = new List<Job>();
         readonly System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer();
         int Spin;
+        string lastDone; DateTime lastDoneAt;
+
+        void ShowLastDone() =>
+            lblJob.Text = string.Format(Lang.T("xong: {0} lúc {1}", "done: {0} at {1}"), Lang.Any(lastDone).ToLower(), lastDoneAt.ToString("HH:mm:ss"));
 
         void UpdateBusy()
         {
             if (Jobs.Count > 0)
             {
                 lblState.ForeColor = Theme.Amber;
-                lblJob.Text = string.Join(", ", Jobs.Select(j => j.Label)).ToLower() + "…";
+                lblJob.Text = string.Join(", ", Jobs.Select(j => Lang.Any(j.Label))).ToLower() + "…";
             }
             else
             {
@@ -175,7 +194,7 @@ namespace CleanVaiLon
             Jobs.Add(job);
             if (pg != null)
             {
-                pg.OvTitle.Text = ">_ " + label.ToLower() + "…";
+                pg.OvTitle.Text = ">_ " + Lang.Any(label).ToLower() + "…";
                 pg.OvSeconds = 0; pg.OvBar.Invalidate(); pg.OvSub.Text = "";
                 pg.OvPanel.Location = new Point((pg.Panel.Width - 460) / 2, (pg.Panel.Height - 104) / 2);
                 pg.OvPanel.Visible = true; pg.OvPanel.BringToFront();
@@ -199,14 +218,14 @@ namespace CleanVaiLon
                     j.Page.OvSeconds = sec; j.Page.OvBar.Invalidate();
                     string extra = "";
                     if (j.Progress != null) { try { extra = j.Progress() ?? ""; } catch { } }
-                    j.Page.OvSub.Text = string.Format("đã chạy {0:N0} giây", sec) + (extra.Length > 0 ? " · " + extra : "");
+                    j.Page.OvSub.Text = string.Format(Lang.T("đã chạy {0:N0} giây", "running for {0:N0} s"), sec) + (extra.Length > 0 ? " · " + extra : "");
                 }
                 if (!j.Completed) continue;
                 Jobs.Remove(j);
                 if (j.Page != null && !Jobs.Any(x => x.Page == j.Page)) j.Page.OvPanel.Visible = false;
-                try { j.Done(j.Result, j.Error); } catch (Exception ex) { ShowInfo("Lỗi khi hiển thị kết quả: " + ex.Message); }
+                try { j.Done(j.Result, j.Error); } catch (Exception ex) { ShowInfo(Lang.T("Lỗi khi hiển thị kết quả: ", "Error while showing the result: ") + ex.Message); }
                 UpdateBusy();
-                if (Jobs.Count == 0) lblJob.Text = "xong: " + j.Label.ToLower() + " lúc " + DateTime.Now.ToString("HH:mm:ss");
+                if (Jobs.Count == 0) { lastDone = j.Label; lastDoneAt = DateTime.Now; ShowLastDone(); }
             }
         }
 
@@ -268,22 +287,22 @@ namespace CleanVaiLon
             foreach (var it in items)
             {
                 var s = Safety.Get(it.Item1);
-                groups[s.Level].Add("• " + it.Item1 + "  (" + Fmt.Size(it.Item2) + ")\r\n    " + s.Why);
+                groups[s.Level].Add("• " + it.Item1 + "  (" + Fmt.Size(it.Item2) + ")\r\n    " + Lang.D(s.Why));
             }
             int go = groups["safe"].Count + groups["review"].Count + groups["keep"].Count;
             if (go == 0)
             {
-                ShowInfo("Tất cả mục đã chọn đều là mục hệ thống, công cụ không cho xoá:\r\n\r\n" + string.Join("\r\n", groups["system"]));
+                ShowInfo(Lang.T("Tất cả mục đã chọn đều là mục hệ thống, công cụ không cho xoá:", "Every selected item is a system item; the tool does not allow deleting them:") + "\r\n\r\n" + string.Join("\r\n", groups["system"]));
                 return false;
             }
-            string msg = "Chuyển " + go + " mục vào Thùng rác?\r\n";
-            if (groups["keep"].Count > 0) msg += "\r\n!! KHÔNG NÊN XOÁ (" + groups["keep"].Count + ") – chỉ tiếp tục nếu bạn chắc chắn:\r\n" + string.Join("\r\n", groups["keep"]) + "\r\n";
-            if (groups["review"].Count > 0) msg += "\r\nCÂN NHẮC (" + groups["review"].Count + "):\r\n" + string.Join("\r\n", groups["review"]) + "\r\n";
-            if (groups["safe"].Count > 0) msg += "\r\nAN TOÀN (" + groups["safe"].Count + "):\r\n" + string.Join("\r\n", groups["safe"]) + "\r\n";
-            if (groups["system"].Count > 0) msg += "\r\nSẼ BỎ QUA – mục hệ thống (" + groups["system"].Count + "):\r\n" + string.Join("\r\n", groups["system"]) + "\r\n";
-            msg += "\r\nMục nào lớn hơn chỗ trống của Thùng rác sẽ được bỏ qua, không bị xoá vĩnh viễn.";
+            string msg = string.Format(Lang.T("Chuyển {0} mục vào Thùng rác?", "Move {0} items to the Recycle Bin?"), go) + "\r\n";
+            if (groups["keep"].Count > 0) msg += "\r\n" + string.Format(Lang.T("!! KHÔNG NÊN XOÁ ({0}) – chỉ tiếp tục nếu bạn chắc chắn:", "!! SHOULDN'T DELETE ({0}) – only continue if you are sure:"), groups["keep"].Count) + "\r\n" + string.Join("\r\n", groups["keep"]) + "\r\n";
+            if (groups["review"].Count > 0) msg += "\r\n" + string.Format(Lang.T("CÂN NHẮC ({0}):", "REVIEW ({0}):"), groups["review"].Count) + "\r\n" + string.Join("\r\n", groups["review"]) + "\r\n";
+            if (groups["safe"].Count > 0) msg += "\r\n" + string.Format(Lang.T("AN TOÀN ({0}):", "SAFE ({0}):"), groups["safe"].Count) + "\r\n" + string.Join("\r\n", groups["safe"]) + "\r\n";
+            if (groups["system"].Count > 0) msg += "\r\n" + string.Format(Lang.T("SẼ BỎ QUA – mục hệ thống ({0}):", "WILL BE SKIPPED – system items ({0}):"), groups["system"].Count) + "\r\n" + string.Join("\r\n", groups["system"]) + "\r\n";
+            msg += "\r\n" + Lang.T("Mục nào lớn hơn chỗ trống của Thùng rác sẽ được bỏ qua, không bị xoá vĩnh viễn.", "Anything larger than the free space in the Recycle Bin is skipped, never deleted permanently.");
             if (!Confirm(msg)) return false;
-            if (groups["keep"].Count > 0 && Cfg.DoubleConfirm) return Confirm("Xác nhận lần nữa: bạn muốn xoá " + groups["keep"].Count + " mục được đánh dấu KHÔNG NÊN XOÁ?");
+            if (groups["keep"].Count > 0 && Cfg.DoubleConfirm) return Confirm(string.Format(Lang.T("Xác nhận lần nữa: bạn muốn xoá {0} mục được đánh dấu KHÔNG NÊN XOÁ?", "Confirm again: do you want to delete {0} items marked SHOULDN'T DELETE?"), groups["keep"].Count));
             return true;
         }
 
